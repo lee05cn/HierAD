@@ -1,0 +1,12 @@
+{
+  "mapping": {
+    "SINTEL": "SINTEL",
+    "LILY": "SINTEL",
+    "KIN": "SINTEL",
+    "SHAMAN": "SHAMAN",
+    "GATEKEEPER": "SHAMAN",
+    "KORVAN": "SHAMAN",
+    "SCALES": "SCALES",
+    "SKILLS": "SCALES"
+  }
+}

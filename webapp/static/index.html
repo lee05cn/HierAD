@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>HierAD · 为视频生成口述影像</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+<style>
+  /* ---------- 本页专属：hero ---------- */
+  .hero { max-width: 640px; margin: 0 auto; padding: 56px 0 0; text-align: center; }
+
+  h1 {
+    margin: 0 0 14px;
+    font-size: clamp(28px, 5.2vw, 40px);
+    font-weight: 600; line-height: 1.18; letter-spacing: -.035em;
+  }
+  .lede {
+    margin: 0 auto 28px; max-width: 46ch;
+    color: var(--muted-strong); font-size: 15.5px; line-height: 1.65;
+  }
+
+  /* ---------- 本页专属：拖放区 ---------- */
+  #drop {
+    border: 1.5px dashed var(--line-strong);
+    border-radius: var(--radius-md);
+    padding: 46px 24px; text-align: center; cursor: pointer;
+    transition: border-color .16s, background .16s;
+  }
+  #drop:hover, #drop.over {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
+  }
+  #drop .icon {
+    width: 42px; height: 42px; margin: 0 auto 14px;
+    color: var(--muted); transition: color .16s, transform .16s;
+  }
+  #drop:hover .icon, #drop.over .icon { color: var(--accent); transform: translateY(-2px); }
+  #drop .big  { font-size: 16px; font-weight: 600; margin-bottom: 7px; letter-spacing: -.01em; }
+  #drop .hint { color: var(--muted); font-size: 12.5px; }
+  #file { display: none; }
+
+  /* ---------- 本页专属：进度 ---------- */
+  .row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; font-size: 14.5px;
+  }
+  .row .stage { font-weight: 600; letter-spacing: -.01em; }
+  .row .meta  { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+  .bar {
+    height: 6px; margin: 16px 0 12px;
+    background: var(--accent-line); border-radius: 999px; overflow: hidden;
+  }
+  .bar > i {
+    display: block; height: 100%; width: 0;
+    background: var(--accent); border-radius: 999px;
+    transition: width .45s cubic-bezier(.4, 0, .2, 1);
+  }
+  .bar.indet > i { width: 34% !important; animation: sweep 1.4s ease-in-out infinite; }
+  @keyframes sweep { 0% { margin-left: -34%; } 100% { margin-left: 100%; } }
+
+  .msg { color: var(--muted); font-size: 12.5px; min-height: 1.5em; }
+
+  /* ---------- 本页专属：结果统计 ---------- */
+  .stats {
+    display: grid; gap: 10px; margin-top: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  }
+  .stat { background: var(--bg-soft); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .stat .k { display: block; color: var(--muted); font-size: 12px; margin-bottom: 3px; }
+  .stat b { font-size: 19px; font-weight: 600; color: var(--fg); letter-spacing: -.015em; }
+  /* 数值用比例数字；tabular-nums 只留给原地跳动的计时文本 */
+
+  video { width: 100%; display: block; margin-top: 16px; border-radius: var(--radius-md); background: #000; }
+
+  /* ---------- 本页专属：失败 ---------- */
+  .errbox { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; }
+  .errbox svg { flex: none; width: 18px; height: 18px; color: var(--err); margin-top: 2px; }
+  .err { margin: 0; font-size: 14px; color: var(--fg); }
+
+  /* ---------- 状态切换：出结果时收起 landing 内容与提示 ---------- */
+  body:has(#panelRun:not(.hidden))  .only-pick,
+  body:has(#panelDone:not(.hidden)) .only-pick,
+  body:has(#panelErr:not(.hidden))  .only-pick { display: none; }
+
+  @media (max-width: 560px) {
+    .hero { padding-top: 36px; }
+    #drop { padding: 34px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="shell">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M4 10v4"/><path d="M8 7v10"/><path d="M12 4v16"/><path d="M16 8v8"/><path d="M20 11v2"/>
+        </svg>
+      </span>
+      <a class="home" href="/">HierAD</a>
+      <span class="tag">口述影像</span>
+    </div>
+    <div class="topbar-right">
+      <a class="btn sm" href="/">项目介绍</a>
+      <button id="themeBtn" aria-label="切换深浅色">
+        <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>
+        </svg>
+        <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+  <section class="hero">
+    <h1>为视频生成口述影像</h1>
+    <p class="lede">
+      上传一段 3–5 分钟的片段，HierAD 会把解说插进对白的间隙里——不盖住台词，也不漏掉画面。
+    </p>
+
+    <div class="notice only-pick">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/><path d="M12 7.8h.01"/><path d="M12 11v5.2"/>
+      </svg>
+      <span>每次生成都会真实调用阿里云百炼（VLM 画面理解 + LLM 撰写 + CosyVoice 语音合成），会消耗你的 API 额度；片段越长，调用次数越多。3–5 分钟的片段整个流程约需 5–10 分钟，期间请勿关闭页面。</span>
+    </div>
+
+    <!-- 1. 选择文件 -->
+    <div class="card" id="panelPick">
+      <div id="drop">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 15.5V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/>
+          <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>
+        </svg>
+        <div class="big">把视频拖到这里</div>
+        <div class="hint">支持 mp4 / mov / mkv / webm / avi · 时长 3–5 分钟 · 不超过 500MB</div>
+      </div>
+      <div class="actions center">
+        <label class="btn primary" for="file">选择视频</label>
+      </div>
+      <input type="file" id="file" accept=".mp4,.mov,.mkv,.webm,.avi,.m4v,video/*">
+    </div>
+
+    <!-- 2. 进行中 -->
+    <div class="card hidden" id="panelRun">
+      <div class="row">
+        <span class="stage" id="runStage" aria-live="polite">准备中</span>
+        <span class="meta" id="runMeta"></span>
+      </div>
+      <div class="bar" id="runBar"><i></i></div>
+      <div class="msg" id="runMsg" aria-live="polite"></div>
+      <div class="actions">
+        <button id="cancelBtn" disabled>上传中…</button>
+      </div>
+    </div>
+
+    <!-- 3. 完成 -->
+    <div class="card hidden" id="panelDone">
+      <div class="row"><span class="stage">生成完成</span><span class="meta" id="doneMeta"></span></div>
+      <video id="player" controls playsinline></video>
+      <div class="stats" id="doneStat"></div>
+      <div class="actions">
+        <a class="btn primary" id="dlVideo" download>下载 AD 视频</a>
+        <a class="btn" id="dlSrt" download>下载字幕 (SRT)</a>
+        <button id="againBtn">再生成一个</button>
+      </div>
+    </div>
+
+    <!-- 4. 失败 -->
+    <div class="card hidden" id="panelErr">
+      <div class="row"><span class="stage">没有成功</span></div>
+      <div class="errbox">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
+          <path d="M12 9v4"/><path d="M12 17h.01"/>
+        </svg>
+        <p class="err" id="errText"></p>
+      </div>
+      <div class="actions">
+        <a class="btn hidden" id="errSrt" download>下载已生成的字幕</a>
+        <button class="primary" id="retryBtn">换一个视频重试</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 原理说明 -->
+  <section class="sec only-pick">
+    <h2>解说怎么挤进去</h2>
+    <p class="note">口述影像的难点不是描述，是时机——话必须落在没人说话的那几秒里。</p>
+    <div class="steps">
+      <div class="step">
+        <div class="no">01</div>
+        <h3>切出间隙</h3>
+        <p>Whisper 识别对白时间轴，再从语声里挖掉真实静音，剩下的空档才是解说能落脚的地方。</p>
+      </div>
+      <div class="step">
+        <div class="no">02</div>
+        <h3>读懂画面</h3>
+        <p>VLM 逐场景读画面，LLM 串起人物与剧情走向，再把这一段的重点压成一句话。</p>
+      </div>
+      <div class="step">
+        <div class="no">03</div>
+        <h3>按长度配音</h3>
+        <p>每句话的字数由它所在间隙的长度决定，CosyVoice 合成后与画面时长对齐，不越界。</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="shell foot">
+  <span>HierAD · 层次化无障碍视频描述</span>
+  <span>本机自用 · 127.0.0.1:8077 · 不对外提供访问</span>
+</footer>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const panels = ["panelPick", "panelRun", "panelDone", "panelErr"];
+  const show = name => panels.forEach(p => $(p).classList.toggle("hidden", p !== name));
+
+  let pollTimer = null, tickTimer = null, startedAt = 0, currentJob = null;
+  let progressLabel = "";   // 当前的 "3/6" 之类，空串表示该阶段没有细粒度进度
+
+  const fmtSec = s => s < 60 ? `${Math.round(s)} 秒`
+                             : `${Math.floor(s / 60)} 分 ${Math.round(s % 60)} 秒`;
+
+  // ---------- 上传 ----------
+  // 用 XHR 而不是 fetch：fetch 拿不到上传进度
+  function upload(file) {
+    show("panelRun");
+    $("runStage").textContent = "上传中";
+    $("runMsg").textContent = file.name;
+    $("runBar").classList.remove("indet");
+    $("runBar").firstElementChild.style.width = "0%";
+    $("cancelBtn").disabled = false;
+    $("cancelBtn").textContent = "上传中…";
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/jobs");
+
+    xhr.upload.onprogress = e => {
+      if (!e.lengthComputable) return;
+      const pct = Math.round(100 * e.loaded / e.total);
+      $("runBar").firstElementChild.style.width = pct + "%";
+      $("runMeta").textContent = `${pct}%`;
+    };
+
+    xhr.onload = () => {
+      $("cancelBtn").disabled = true;
+      $("cancelBtn").textContent = "生成中，请勿关闭页面";
+      let body = null;
+      try { body = JSON.parse(xhr.responseText); } catch (_) {}
+      if (xhr.status === 201 && body && body.job_id) {
+        currentJob = body.job_id;
+        startedAt = Date.now();
+        startTicking();
+        poll(body.job_id);
+      } else {
+        fail((body && body.detail) || `上传失败（HTTP ${xhr.status}）`);
+      }
+    };
+
+    xhr.onerror = () => { $("cancelBtn").disabled = true; fail("网络错误，上传失败。"); };
+    xhr.send(fd);
+  }
+
+  // ---------- 轮询 ----------
+  function poll(jobId) {
+    const url = `/api/jobs/${jobId}`;
+    const tick = async () => {
+      let s;
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (r.status === 404) { fail("任务不存在了（可能已被清理）。"); return; }
+        if (!r.ok) return;               // 瞬时错误，下次再试
+        s = await r.json();
+      } catch (_) { return; }            // 网络抖动，下次再试
+
+      if (s.status === "done")       { clearTimers(); done(s); }
+      else if (s.status === "error") { clearTimers(); fail(s.error || "生成失败。", s); }
+      else                           { render(s); }
+    };
+    tick();
+    pollTimer = setInterval(tick, 1000);
+  }
+
+  function render(s) {
+    $("runStage").textContent = s.stage || "生成中";
+    if (s.current != null && s.total) {
+      $("runBar").classList.remove("indet");
+      $("runBar").firstElementChild.style.width =
+        Math.round(100 * s.current / s.total) + "%";
+      progressLabel = `${s.current}/${s.total}`;
+    } else {
+      // 单个阶段内部没有细粒度进度，用不确定态动画，避免看起来像卡死
+      $("runBar").classList.add("indet");
+      progressLabel = "";
+    }
+    paintMeta();
+    $("runMsg").textContent = s.message || "";
+  }
+
+  // 已等待时间必须一直可见：最耗时的阶段恰恰是那些没有数值进度的
+  function paintMeta() {
+    const waited = `已等待 ${fmtSec((Date.now() - startedAt) / 1000)}`;
+    $("runMeta").textContent = progressLabel ? `${progressLabel} · ${waited}` : waited;
+  }
+
+  function startTicking() {
+    tickTimer = setInterval(paintMeta, 1000);
+  }
+
+  function clearTimers() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  }
+
+  // ---------- 结果 ----------
+  function done(s) {
+    show("panelDone");
+    $("player").src = `/api/jobs/${s.job_id}/video`;
+    $("dlVideo").href = `/api/jobs/${s.job_id}/video`;
+    $("dlVideo").setAttribute("download", `AD_${s.filename || "video.mp4"}`);
+
+    const srt = $("dlSrt");
+    if (s.has_srt) {
+      srt.href = `/api/jobs/${s.job_id}/srt`;
+      srt.classList.remove("hidden");
+    } else {
+      srt.classList.add("hidden");
+    }
+
+    $("doneMeta").textContent = `用时 ${fmtSec(s.elapsed_sec)}`;
+    $("doneStat").innerHTML =
+      `<span class="stat"><span class="k">视频时长</span><b>${s.duration_sec}s</b></span>` +
+      `<span class="stat"><span class="k">识别对白</span><b>${s.asr_segments} 段</b></span>` +
+      `<span class="stat"><span class="k">生成解说</span><b>${s.ad_count} 段</b></span>`;
+  }
+
+  function fail(message, s) {
+    clearTimers();
+    show("panelErr");
+    $("errText").textContent = message;
+    const srt = $("errSrt");
+    if (s && s.job_id && s.has_srt) {
+      srt.href = `/api/jobs/${s.job_id}/srt`;
+      srt.classList.remove("hidden");
+    } else {
+      srt.classList.add("hidden");
+    }
+  }
+
+  function reset() {
+    clearTimers();
+    currentJob = null;
+    $("player").removeAttribute("src");
+    $("file").value = "";
+    $("runBar").firstElementChild.style.width = "0%";
+    show("panelPick");
+  }
+
+  // ---------- 事件 ----------
+  const drop = $("drop"), picker = $("file");
+  drop.onclick = () => picker.click();
+  picker.onchange = () => { if (picker.files[0]) upload(picker.files[0]); };
+
+  ["dragenter", "dragover"].forEach(ev =>
+    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev =>
+    drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => {
+    const f = e.dataTransfer.files[0];
+    if (f) upload(f);
+  });
+
+  $("againBtn").onclick = reset;
+  $("retryBtn").onclick = reset;
+})();
+</script>
+</body>
+</html>

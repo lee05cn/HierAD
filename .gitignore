@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Output
+work_dir/
+actor_databases/
+logs/
+*.mp4
+*.wav
+*.log
+webapp/jobs/
+
+# Local scratch / backups
+*.bak
+*.bak-*
+
+# Secrets / local config
+config.yaml
+.env
+.env.*
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/

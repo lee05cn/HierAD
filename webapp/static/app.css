@@ -1,0 +1,259 @@
+/* ============================================================
+   HierAD · 共享样式层
+   index.html（工具页）与 landing.html（宣传页）共用。
+   改配色 / 圆角 / 按钮，只改这一个文件。
+   ============================================================ */
+
+/* ---------- 令牌：浅色为基准；深色单独选色（不是反转） ----------
+   中性近黑承担主色，彩色只留给焦点环与状态色 */
+:root {
+  --bg:        #ffffff;
+  --bg-soft:   #f7f7f8;
+  --surface:   #ffffff;
+  --surface-2: #f2f2f3;
+
+  --line:        #ececee;
+  --line-strong: #d9d9de;
+
+  --fg:          #0d0d0d;
+  --fg-soft:     #3c3c43;
+  --muted:       #8e8ea0;
+  --muted-strong:#6e6e80;
+
+  --fill:       #0d0d0d;
+  --fill-hover: #2b2b2b;
+  --fill-fg:    #ffffff;
+
+  /* 蓝：只做点缀，不做主色——靠面积小、饱和低来克制 */
+  --accent:      #3b6ef5;
+  --accent-fg:   #ffffff;
+  --accent-soft: #f0f5ff;   /* 极淡蓝底：hero 光晕、收尾面板 */
+  --accent-line: #d9e4fd;   /* 淡蓝描边 / 进度条轨道 */
+
+  --warn-fg: #7a5a09;  --warn-bg: #fffaf0;  --warn-line: #f2e4c2;
+  --err:     #c8372c;
+
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 11px;
+
+  --shadow-sm: 0 1px 2px rgba(13, 13, 13, .04);
+  --shadow-md: 0 6px 24px -8px rgba(13, 13, 13, .10);
+
+  color-scheme: light;
+}
+/* 深色块只覆盖「需要随主题变」的令牌；--radius-* 与主题无关，从 :root 继承。
+   加新令牌时三块都要看一眼——漏一块就会在那个主题下静默失效。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:        #212121;
+    --bg-soft:   #191919;
+    --surface:   #2f2f2f;
+    --surface-2: #3a3a3a;
+    --line:        #3f3f3f;
+    --line-strong: #565656;
+    --fg:          #ececec;
+    --fg-soft:     #c9c9c9;
+    --muted:       #9b9b9b;
+    --muted-strong:#b4b4b4;
+    --fill:       #ececec;
+    --fill-hover: #ffffff;
+    --fill-fg:    #1a1a1a;
+
+    --accent:      #7fa8ff;
+    --accent-fg:   #0b1220;
+    --accent-soft: #1a2233;
+    --accent-line: #2b3a57;
+
+    --warn-fg: #e8c97e;  --warn-bg: #2b2418;  --warn-line: #443a22;
+    --err:     #ff6b60;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25);
+    --shadow-md: 0 6px 24px -8px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+/* 手动切换：显式深色，优先级高于系统设置（必须重复一份，否则压不过媒体查询） */
+:root[data-theme="dark"] {
+  --bg:        #212121;
+  --bg-soft:   #191919;
+  --surface:   #2f2f2f;
+  --surface-2: #3a3a3a;
+  --line:        #3f3f3f;
+  --line-strong: #565656;
+  --fg:          #ececec;
+  --fg-soft:     #c9c9c9;
+  --muted:       #9b9b9b;
+  --muted-strong:#b4b4b4;
+  --fill:       #ececec;
+  --fill-hover: #ffffff;
+  --fill-fg:    #1a1a1a;
+
+  --accent:      #7fa8ff;
+  --accent-fg:   #0b1220;
+  --accent-soft: #1a2233;
+  --accent-line: #2b3a57;
+
+  --warn-fg: #e8c97e;  --warn-bg: #2b2418;  --warn-line: #443a22;
+  --err:     #ff6b60;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25);
+  --shadow-md: 0 6px 24px -8px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+
+/* ---------- 基础 ---------- */
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background .2s ease, color .2s ease;
+}
+::selection { background: color-mix(in srgb, var(--fg) 12%, transparent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+.shell { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.topbar .shell {
+  height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand .mark {
+  flex: none; width: 28px; height: 28px; border-radius: 9px;
+  background: var(--accent); color: var(--accent-fg);
+  display: grid; place-items: center;
+}
+.brand .mark svg { width: 16px; height: 16px; }
+.brand a.home {
+  font-size: 15px; font-weight: 600; letter-spacing: -.01em;
+  color: inherit; text-decoration: none;
+}
+.brand .tag {
+  font-size: 12px; color: var(--muted-strong); white-space: nowrap;
+  padding-left: 10px; margin-left: 2px; border-left: 1px solid var(--line-strong);
+}
+
+#themeBtn {
+  flex: none;
+  width: 34px; height: 34px; padding: 0;
+  display: grid; place-items: center; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: transparent; color: var(--muted-strong);
+  transition: background .15s, color .15s, border-color .15s;
+}
+#themeBtn:hover { background: var(--surface-2); color: var(--fg); border-color: var(--line-strong); }
+#themeBtn svg { width: 17px; height: 17px; }
+#themeBtn .i-sun { display: none; }
+:root[data-theme="dark"] #themeBtn .i-sun  { display: block; }
+:root[data-theme="dark"] #themeBtn .i-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) #themeBtn .i-sun  { display: block; }
+  :root:not([data-theme="light"]) #themeBtn .i-moon { display: none; }
+}
+
+/* ---------- 卡片 ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 28px;
+}
+.card + .card { margin-top: 14px; }
+
+/* ---------- 提示条：图标 + 文案，不靠颜色单独表意 ---------- */
+.notice {
+  display: flex; gap: 10px; align-items: flex-start; text-align: left;
+  background: var(--warn-bg); color: var(--warn-fg);
+  border: 1px solid var(--warn-line); border-radius: var(--radius-md);
+  padding: 12px 15px; margin: 0 0 16px;
+  font-size: 12.5px; line-height: 1.6;
+}
+.notice svg { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+
+/* ---------- 按钮 ---------- */
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+.actions.center { justify-content: center; }
+
+button, .btn {
+  font: inherit; font-size: 14px; font-weight: 500;
+  padding: 10px 18px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--line-strong);
+  background: var(--surface); color: var(--fg);
+  text-decoration: none; display: inline-block; text-align: center;
+  transition: background .15s, border-color .15s, color .15s;
+}
+button:hover:not(:disabled), .btn:hover { background: var(--surface-2); }
+button.primary, .btn.primary {
+  background: var(--fill); border-color: var(--fill); color: var(--fill-fg);
+}
+button.primary:hover:not(:disabled), .btn.primary:hover {
+  background: var(--fill-hover); border-color: var(--fill-hover);
+}
+button:disabled { opacity: .45; cursor: not-allowed; }
+.btn.lg { padding: 12px 26px; font-size: 14.5px; }
+.btn.sm { padding: 7px 14px; font-size: 13.5px; }
+.actions.center .btn { padding: 11px 26px; }
+
+/* ---------- 区块标题（两个页面共用） ---------- */
+.sec { margin-top: 76px; }
+.sec h2 { margin: 0 0 4px; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.sec .note { margin: 0 0 26px; color: var(--muted); font-size: 13px; }
+
+/* 变体：标题与说明并排一行（landing 用）。放在 .sec 之后，靠同权重后者胜出。 */
+.sec-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px 24px; flex-wrap: wrap; margin-bottom: 26px;
+}
+.sec-head h2 { margin: 0; }
+.sec-head .note { margin: 0; }
+
+/* ---------- 编号步骤 ---------- */
+.steps {
+  display: grid; gap: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.step { padding-top: 18px; border-top: 1px solid var(--line); }
+.step .no {
+  font-size: 12px; font-weight: 600; letter-spacing: .06em;
+  color: var(--accent); margin-bottom: 9px;
+}
+.step h3 { margin: 0 0 6px; font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+.step p  { margin: 0; color: var(--muted-strong); font-size: 13px; line-height: 1.65; }
+
+/* ---------- 页脚 ---------- */
+.foot {
+  margin-top: 72px; padding: 26px 0 60px;
+  border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 12.5px;
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  html { scroll-behavior: auto; }
+}
+
+@media (max-width: 560px) {
+  .shell { padding: 0 16px; }
+  .card { padding: 20px; }
+  .sec { margin-top: 52px; }
+  .brand .tag { display: none; }
+}
