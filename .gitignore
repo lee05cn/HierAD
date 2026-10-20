@@ -24,6 +24,9 @@ logs/
 *.wav
 *.log
 webapp/jobs/
+webapp/*.db
+webapp/*.db-wal
+webapp/*.db-shm
 
 # Local scratch / backups
 *.bak

@@ -37,6 +37,7 @@ def synthesize_ad_clips(
     save_dir: Union[str, Path],
     *,
     tts_url: Optional[str] = None,
+    voice: Optional[str] = None,
     voice_id: Optional[str] = None,
     prompt_text: Optional[str] = None,
     spk_id: Optional[str] = None,
@@ -46,7 +47,7 @@ def synthesize_ad_clips(
     """
     逐条调用 TTS，返回 wav 路径列表。
     provider=local 时走本机 CosyVoice /inference_single；
-    provider=dashscope 时走百炼 CosyVoice 云端音色。
+    provider=dashscope 时走百炼 CosyVoice 云端音色（`voice` 直接是音色名）。
     """
     if get_tts_provider() == "dashscope":
         from hierad.providers.tts import synthesize_with_dashscope
@@ -54,7 +55,8 @@ def synthesize_ad_clips(
         return synthesize_with_dashscope(
             list(texts),
             Path(save_dir),
-            voice=TTS_CLOUD_VOICE,
+            voice=(voice or TTS_CLOUD_VOICE),
+            speed=speed,
         )
 
     base = (tts_url or TTS_URL).rstrip("/")
@@ -249,6 +251,7 @@ def synthesize_and_build_track(
     *,
     track_len_sec: float,
     tts_url: Optional[str] = None,
+    voice: Optional[str] = None,
     voice_id: Optional[str] = None,
     prompt_text: Optional[str] = None,
     spk_id: Optional[str] = None,
@@ -280,6 +283,7 @@ def synthesize_and_build_track(
         texts,
         tts_dir,
         tts_url=tts_url,
+        voice=voice,
         voice_id=voice_id,
         prompt_text=prompt_text,
         spk_id=spk_id,

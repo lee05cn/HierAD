@@ -21,15 +21,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from hierad.config import PROJECT_ROOT
+from hierad.config import PROJECT_ROOT, WEB_KEEP_JOBS
 from hierad.pipeline import run_pipeline
 from hierad.preprocess import transcribe_video
 from hierad.progress import ProgressReporter, ProgressUpdate
 
+from . import db
+
 JOBS_DIR = PROJECT_ROOT / "webapp" / "jobs"
 
 MAX_QUEUE = 3          # 排队上限（含正在跑的那个）
-KEEP_JOB_DIRS = 10     # 保留最近 N 个任务目录
+KEEP_JOB_DIRS = WEB_KEEP_JOBS  # 保留最近 N 个任务目录
 PROGRESS_FLUSH_SEC = 1.0
 MIN_GAP_SEC = 2.0
 
@@ -89,6 +91,9 @@ class Job:
     ad_count: int = 0
     ad_video: Optional[str] = None
     ad_srt: Optional[str] = None
+    tts_voice: Optional[str] = None
+    tts_speed: Optional[float] = None
+    user_id: Optional[int] = None
     created_at: float = field(default_factory=time.time)
     started_at: Optional[float] = None
     finished_at: Optional[float] = None
@@ -109,9 +114,37 @@ class Job:
             "ad_count": self.ad_count,
             "has_video": bool(self.ad_video),
             "has_srt": bool(self.ad_srt),
+            "created_at": self.created_at,
+            "finished_at": self.finished_at,
             "elapsed_sec": round(
                 (self.finished_at or time.time()) - (self.started_at or self.created_at), 1
             ),
+        }
+
+    def to_db_dict(self) -> Dict[str, Any]:
+        return {
+            "job_id": self.job_id,
+            "user_id": self.user_id,
+            "filename": self.filename,
+            "video_path": self.video_path,
+            "work_dir": self.work_dir,
+            "duration_sec": self.duration_sec,
+            "status": self.status,
+            "stage": self.stage,
+            "current": self.current,
+            "total": self.total,
+            "message": self.message,
+            "error": self.error,
+            "asr_segments": self.asr_segments,
+            "ad_count": self.ad_count,
+            "ad_video": self.ad_video,
+            "ad_srt": self.ad_srt,
+            "tts_voice": self.tts_voice,
+            "tts_speed": self.tts_speed,
+            "created_at": self.created_at,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "updated_at": time.time(),
         }
 
 
@@ -128,7 +161,178 @@ class QueueFull(RuntimeError):
     """排队已满，拒绝新任务。"""
 
 
-def submit(video_path: Path, filename: str, duration_sec: float) -> Job:
+# ==================== 持久化 / 行转换 ====================
+
+_persist_warned: set = set()
+
+
+def _persist(job: Job) -> None:
+    """把任务快照写进 SQLite。失败不打断管线，但每个任务只提示一次。"""
+    with _lock:
+        payload = job.to_db_dict()
+    try:
+        db.upsert_job(payload)
+    except Exception as e:  # sqlite3.Error / OSError
+        with _lock:
+            already = job.job_id in _persist_warned
+            _persist_warned.add(job.job_id)
+        if not already:
+            print(f"[webapp] 任务 {job.job_id} 持久化失败：{type(e).__name__}: {e}")
+
+
+def _row_to_job(row: Dict[str, Any]) -> Job:
+    return Job(
+        job_id=str(row["job_id"]),
+        filename=str(row.get("filename") or ""),
+        video_path=str(row.get("video_path") or ""),
+        work_dir=str(row.get("work_dir") or ""),
+        duration_sec=float(row.get("duration_sec") or 0),
+        status=str(row.get("status") or STATUS_QUEUED),
+        stage=str(row.get("stage") or ""),
+        current=row.get("current"),
+        total=row.get("total"),
+        message=str(row.get("message") or ""),
+        error=str(row.get("error") or ""),
+        asr_segments=int(row.get("asr_segments") or 0),
+        ad_count=int(row.get("ad_count") or 0),
+        ad_video=row.get("ad_video"),
+        ad_srt=row.get("ad_srt"),
+        tts_voice=row.get("tts_voice"),
+        tts_speed=row.get("tts_speed"),
+        user_id=row.get("user_id"),
+        created_at=float(row.get("created_at") or time.time()),
+        started_at=row.get("started_at"),
+        finished_at=row.get("finished_at"),
+        last_flush=0.0,
+    )
+
+
+def _row_to_api(row: Dict[str, Any], include_owner: bool = False) -> Dict[str, Any]:
+    started = row.get("started_at") or row.get("created_at") or time.time()
+    finished = row.get("finished_at") or time.time()
+    data = {
+        "job_id": row["job_id"],
+        "filename": row.get("filename") or "",
+        "duration_sec": round(float(row.get("duration_sec") or 0), 1),
+        "status": row.get("status") or STATUS_ERROR,
+        "stage": row.get("stage") or "",
+        "current": row.get("current"),
+        "total": row.get("total"),
+        "message": row.get("message") or "",
+        "error": row.get("error") or "",
+        "asr_segments": int(row.get("asr_segments") or 0),
+        "ad_count": int(row.get("ad_count") or 0),
+        "has_video": bool(row.get("ad_video")),
+        "has_srt": bool(row.get("ad_srt")),
+        "created_at": row.get("created_at"),
+        "finished_at": row.get("finished_at"),
+        "elapsed_sec": round(max(0.0, finished - started), 1),
+    }
+    if include_owner:
+        data["owner"] = row.get("owner")
+    return data
+
+
+def get_record(job_id: str) -> Optional[Dict[str, Any]]:
+    """取内部记录（含 user_id / 产物路径），活跃任务优先。"""
+    with _lock:
+        job = _jobs.get(job_id)
+        if job is not None:
+            return job.to_db_dict()
+    return db.get_job_row(job_id)
+
+
+def get_for_user(job_id: str, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """带归属校验的状态快照；无权访问与不存在都返回 None。"""
+    record = get_record(job_id)
+    if record is None:
+        return None
+    if not user.get("is_admin") and record.get("user_id") != user.get("id"):
+        return None
+    with _lock:
+        job = _jobs.get(job_id)
+        if job is not None:
+            return job.to_dict()
+    row = db.get_job_row(job_id)
+    return _row_to_api(row) if row else None
+
+
+def paths_for_user(
+    job_id: str, user: Dict[str, Any]
+) -> Optional[tuple]:
+    """带归属校验的产物路径；返回 (video, srt) 或 None。"""
+    record = get_record(job_id)
+    if record is None:
+        return None
+    if not user.get("is_admin") and record.get("user_id") != user.get("id"):
+        return None
+    return record.get("ad_video"), record.get("ad_srt")
+
+
+def list_history(
+    user: Dict[str, Any], limit: int = 20, offset: int = 0, scope: str = "own"
+) -> List[Dict[str, Any]]:
+    owner_id = None if (user.get("is_admin") and scope == "all") else user.get("id")
+    rows = db.list_jobs(owner_id, limit=limit, offset=offset)
+    items: List[Dict[str, Any]] = []
+    for row in rows:
+        with _lock:
+            live = _jobs.get(str(row["job_id"]))
+        item = live.to_dict() if live is not None else _row_to_api(
+            row, include_owner=bool(user.get("is_admin"))
+        )
+        if user.get("is_admin"):
+            item["owner"] = row.get("owner")
+        items.append(item)
+    return items
+
+
+def recover() -> None:
+    """启动时把 DB 状态接回内存。
+
+    - running：进程已死，管线状态不可信，标为中断，让用户重提。
+    - queued：输入文件还在就直接重新排队。
+    """
+    message = "服务重启，任务已中断，请重新提交。"
+    db.mark_running_interrupted(message)
+
+    queued = db.queued_job_ids()
+    if not queued:
+        return
+
+    _ensure_worker()
+    for job_id in queued:
+        row = db.get_job_row(job_id)
+        if not row:
+            continue
+        job = _row_to_job(row)
+        if not Path(job.video_path).exists():
+            with _lock:
+                job.status = STATUS_ERROR
+                job.error = "服务重启，任务已中断（找不到输入文件）。"
+                job.finished_at = time.time()
+            _persist(job)
+            continue
+        with _lock:
+            _jobs[job_id] = job
+        try:
+            _queue.put_nowait(job_id)
+        except queue.Full:
+            with _lock:
+                job.status = STATUS_ERROR
+                job.error = "服务重启后排队已满，任务未能恢复。"
+                job.finished_at = time.time()
+            _persist(job)
+
+
+def submit(
+    video_path: Path,
+    filename: str,
+    duration_sec: float,
+    user_id: Optional[int] = None,
+    tts_voice: Optional[str] = None,
+    tts_speed: Optional[float] = None,
+) -> Job:
     """登记任务并入队。
 
     `video_path` 是上传落地的临时文件，这里把它挪进任务目录 —— 必须**先挪再入队**，
@@ -148,29 +352,40 @@ def submit(video_path: Path, filename: str, duration_sec: float) -> Job:
         video_path=str(staged),
         work_dir=str(work_dir),
         duration_sec=duration_sec,
+        user_id=user_id,
+        tts_voice=tts_voice,
+        tts_speed=tts_speed,
     )
     with _lock:
         _jobs[job_id] = job
+
+    # 先落库再入队：进程在两步之间崩掉时，至少还有一条 queued 记录可恢复。
+    _persist(job)
 
     try:
         _queue.put_nowait(job_id)
     except queue.Full:
         with _lock:
             _jobs.pop(job_id, None)
+        db.delete_job(job_id)
+        shutil.rmtree(work_dir, ignore_errors=True)
         raise QueueFull(f"排队已满（上限 {MAX_QUEUE}），等前面的任务跑完再提交。")
 
     return job
 
 
 def get(job_id: str) -> Optional[Dict[str, Any]]:
-    """取任务状态快照。"""
+    """取任务状态快照：活跃任务走内存，历史任务回落 SQLite。"""
     with _lock:
         job = _jobs.get(job_id)
-        return job.to_dict() if job else None
+        if job is not None:
+            return job.to_dict()
+    row = db.get_job_row(job_id)
+    return _row_to_api(row) if row else None
 
 
 def get_job(job_id: str) -> Optional[Job]:
-    """取内部 Job 对象（路由层拿文件路径用）。"""
+    """取内部 Job 对象（仅活跃任务；历史任务请走 get_record）。"""
     with _lock:
         return _jobs.get(job_id)
 
@@ -212,6 +427,7 @@ def _run_job(job: Job) -> None:
         job.status = STATUS_RUNNING
         job.started_at = time.time()
         job.stage = "准备中"
+    _persist(job)
 
     reporter = ProgressReporter(
         show=False,  # 不往服务器终端刷 tqdm
@@ -245,6 +461,9 @@ def _run_job(job: Job) -> None:
             show_progress=False,
             pipeline_version="v3",  # Clip→Shot→Scene 三层：旁白有上下文、有故事线
             # burn_ad / enable_tts / translate_zh 用默认 True → 出成片 + 中文 SRT
+            # 音色 / 语速来自上传时的「配音设置」；dashscope 下 tts_voice_name 就是百炼音色名
+            tts_voice_name=job.tts_voice,
+            tts_speed=job.tts_speed,
         )
 
         _collect_result(job, work_dir)
@@ -338,30 +557,47 @@ def _write_progress(job: Job) -> None:
         )
     except OSError:
         pass  # 进度快照写不了不该影响主流程
+    _persist(job)  # 与文件快照同频（1 秒节流），历史列表据此更新
 
 
 # ==================== 清理 ====================
 
 
 def _prune_old_jobs() -> None:
-    """只保留最近 KEEP_JOB_DIRS 个已结束的任务目录。"""
+    """保留最近 KEEP_JOB_DIRS 个已结束的任务目录，并同步删除 DB 行。
+
+    排队/运行中的任务不参与淘汰；`_incoming` 是上传中转目录，永远不碰。
+    """
     try:
-        dirs = sorted(
-            (d for d in JOBS_DIR.iterdir() if d.is_dir()),
-            key=lambda d: d.stat().st_mtime,
-            reverse=True,
-        )
+        dirs = [
+            d
+            for d in JOBS_DIR.iterdir()
+            if d.is_dir() and not d.name.startswith("_")
+        ]
     except OSError:
         return
 
-    for d in dirs[KEEP_JOB_DIRS:]:
+    with _lock:
+        active = {
+            job_id
+            for job_id, job in _jobs.items()
+            if job.status in (STATUS_QUEUED, STATUS_RUNNING)
+        }
+    candidates = [d for d in dirs if d.name not in active]
+    try:
+        candidates.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+    except OSError:
+        return
+
+    removed: List[str] = []
+    for d in candidates[KEEP_JOB_DIRS:]:
+        shutil.rmtree(d, ignore_errors=True)
         with _lock:
-            job = _jobs.get(d.name)
-            # 还在跑或还在排队的不能删
-            if job is not None and job.status in (STATUS_QUEUED, STATUS_RUNNING):
-                continue
             _jobs.pop(d.name, None)
+        removed.append(d.name)
+
+    if removed:
         try:
-            shutil.rmtree(d, ignore_errors=True)
-        except OSError:
-            pass
+            db.delete_jobs(removed)
+        except Exception as e:  # sqlite3.Error / OSError
+            print(f"[webapp] 清理任务记录失败：{type(e).__name__}: {e}")

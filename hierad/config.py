@@ -9,6 +9,7 @@ HierAD 统一配置
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -56,6 +57,15 @@ _DEFAULTS = {
     "ACTOR_DATABASES_DIR": str(PROJECT_ROOT / "actor_databases"),
     "DASHSCOPE_API_KEY": "",
     "DASHSCOPE_BASE_URL": DASHSCOPE_COMPAT_URL,
+    # Web 演示平台（鉴权 + SQLite 持久化）
+    "WEB_HOST": "127.0.0.1",
+    "WEB_PORT": "8077",
+    "WEB_DB_PATH": str(PROJECT_ROOT / "webapp" / "hierad_web.db"),
+    "WEB_ALLOW_REGISTRATION": "true",
+    "WEB_REGISTRATION_CODE": "",
+    "WEB_COOKIE_SECURE": "false",
+    "WEB_SESSION_HOURS": "168",
+    "WEB_KEEP_JOBS": "20",
 }
 
 
@@ -209,6 +219,49 @@ ACTOR_DATABASES_DIR = Path(
     or _DEFAULTS["ACTOR_DATABASES_DIR"]
 )
 
+# ==================== Web 平台配置 ====================
+WEB_HOST = _pick("HIERAD_WEB_HOST", "web", "host", default=_DEFAULTS["WEB_HOST"])
+try:
+    WEB_PORT = int(_pick("HIERAD_WEB_PORT", "web", "port", default=_DEFAULTS["WEB_PORT"]))
+except (TypeError, ValueError):
+    WEB_PORT = int(_DEFAULTS["WEB_PORT"])
+
+_web_db_raw = _pick("HIERAD_WEB_DB_PATH", "web", "db_path", default=_DEFAULTS["WEB_DB_PATH"])
+_web_db_path = Path(_web_db_raw)
+WEB_DB_PATH = str(_web_db_path if _web_db_path.is_absolute() else PROJECT_ROOT / _web_db_path)
+
+WEB_ALLOW_REGISTRATION = str(
+    _pick(
+        "HIERAD_WEB_ALLOW_REGISTRATION",
+        "web",
+        "allow_registration",
+        default=_DEFAULTS["WEB_ALLOW_REGISTRATION"],
+    )
+).lower() in ("1", "true", "yes", "on")
+WEB_REGISTRATION_CODE = _pick(
+    "HIERAD_WEB_REGISTRATION_CODE",
+    "web",
+    "registration_code",
+    default=_DEFAULTS["WEB_REGISTRATION_CODE"],
+)
+WEB_COOKIE_SECURE = str(
+    _pick("HIERAD_WEB_COOKIE_SECURE", "web", "cookie_secure", default=_DEFAULTS["WEB_COOKIE_SECURE"])
+).lower() in ("1", "true", "yes", "on")
+try:
+    WEB_SESSION_HOURS = max(
+        1,
+        int(_pick("HIERAD_WEB_SESSION_HOURS", "web", "session_hours", default=_DEFAULTS["WEB_SESSION_HOURS"])),
+    )
+except (TypeError, ValueError):
+    WEB_SESSION_HOURS = int(_DEFAULTS["WEB_SESSION_HOURS"])
+try:
+    WEB_KEEP_JOBS = max(
+        1,
+        int(_pick("HIERAD_WEB_KEEP_JOBS", "web", "keep_jobs", default=_DEFAULTS["WEB_KEEP_JOBS"])),
+    )
+except (TypeError, ValueError):
+    WEB_KEEP_JOBS = int(_DEFAULTS["WEB_KEEP_JOBS"])
+
 
 def get_llm_provider() -> str:
     return _norm_provider(
@@ -245,6 +298,69 @@ def get_dashscope_api_key() -> str:
         or DASHSCOPE_API_KEY
         or ""
     ).strip()
+
+
+def set_dashscope_api_key(new_key: str) -> bool:
+    """运行时更新 DashScope API Key（Web 管理页用）。
+
+    - 立即生效：写入 os.environ + 模块级 DASHSCOPE_API_KEY。get_dashscope_api_key
+      先读环境变量，所以下一个任务起就用新 key，**无需重启服务**。
+    - 落盘 config.yaml：进程重启后仍然有效。
+
+    返回是否成功写回 config.yaml；写盘失败也不阻断内存生效，只返回 False。
+    """
+    global DASHSCOPE_API_KEY
+    key = (new_key or "").strip()
+    DASHSCOPE_API_KEY = key
+    if key:
+        os.environ["DASHSCOPE_API_KEY"] = key
+    else:
+        os.environ.pop("DASHSCOPE_API_KEY", None)
+    return _write_dashscope_key_to_yaml(key)
+
+
+def _write_dashscope_key_to_yaml(key: str) -> bool:
+    """把 dashscope.api_key 写回 config.yaml——只改这一行，保留其余注释与结构。"""
+    path = PROJECT_ROOT / "config.yaml"
+    if not path.exists():
+        return False
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+
+    value = json.dumps(key, ensure_ascii=False)
+    dash_idx = next(
+        (i for i, ln in enumerate(lines) if ln.strip() == "dashscope:"), None
+    )
+
+    if dash_idx is None:
+        # 没有 dashscope 段：整体追加一个
+        if lines and lines[-1].strip() != "":
+            lines.append("")
+        lines.append("dashscope:")
+        lines.append(f"  api_key: {value}")
+    else:
+        key_idx = None
+        for i in range(dash_idx + 1, len(lines)):
+            s = lines[i].strip()
+            if s.startswith("api_key:"):
+                key_idx = i
+                break
+            # 遇到下一个顶级键（不缩进、非注释非空）就停：说明 dashscope 段里没有 api_key
+            if s and not lines[i].startswith((" ", "\t")) and not s.startswith("#"):
+                break
+        if key_idx is None:
+            lines.insert(dash_idx + 1, f"  api_key: {value}")
+        else:
+            indent = lines[key_idx][: len(lines[key_idx]) - len(lines[key_idx].lstrip())]
+            lines[key_idx] = f"{indent}api_key: {value}"
+
+    try:
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return True
+    except OSError:
+        return False
 
 
 def resolve_llm_settings(

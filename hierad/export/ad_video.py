@@ -313,6 +313,10 @@ def export_ad_video(
     # 有克隆音色时不用 SFT spk_id
     resolved_spk = None if resolved_voice else (spk_id if spk_id is not None else TTS_SPK_ID or None)
 
+    # 百炼云端：voice_name 直接就是百炼音色名（如 longwan_v2），不查本地 VD-agent 库；
+    # 本地 CosyVoice 才用上面的 resolved_voice / prompt。dash_voice 为空时走 config 默认音色。
+    dash_voice = voice_name if get_tts_provider() == "dashscope" else None
+
     ad_wav: Optional[Path] = None
     tts_note = ""
     if enable_tts:
@@ -332,6 +336,7 @@ def export_ad_video(
                 work_dir,
                 track_len_sec=duration,
                 tts_url=tts_url,
+                voice=dash_voice,
                 voice_id=resolved_voice,
                 prompt_text=resolved_prompt,
                 spk_id=resolved_spk,
@@ -361,6 +366,9 @@ def export_ad_video(
         result["voice_id"] = resolved_voice
         if voice_display:
             result["voice_name"] = voice_display
+    if dash_voice:
+        result["voice_id"] = dash_voice
+        result["voice_name"] = dash_voice
     if ad_wav is not None:
         result["ad_audio_path"] = str(ad_wav)
     if tts_note and ad_wav is None:

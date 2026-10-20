@@ -8,92 +8,321 @@
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/app.js"></script>
 <style>
-  /* ---------- 本页专属：hero ---------- */
-  .hero { max-width: 640px; margin: 0 auto; padding: 56px 0 0; text-align: center; }
+  /* 顶部环境光，与首页同一套语言 */
+  body {
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(56% 36% at 50% -8%, color-mix(in srgb, var(--accent) 11%, transparent) 0%, transparent 72%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
 
+  /* ---------- 本页专属：hero ---------- */
+  .hero { max-width: 680px; padding: 68px 0 0; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin: 0 0 16px; padding: 5px 12px 5px 9px;
+    border: 1px solid var(--accent-line); border-radius: var(--r-full);
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+    color: var(--accent); font-size: 11.5px; font-weight: 600; letter-spacing: .06em;
+  }
+  .eyebrow::before {
+    content: ""; width: 6px; height: 6px; border-radius: var(--r-full); background: var(--grad);
+  }
   h1 {
     margin: 0 0 14px;
-    font-size: clamp(28px, 5.2vw, 40px);
-    font-weight: 600; line-height: 1.18; letter-spacing: -.035em;
+    font-size: clamp(31px, 5vw, 45px);
+    font-weight: 680; line-height: 1.14; letter-spacing: -.042em;
+  }
+  /* ⚠ 渐变文字必须留兜底色：background-clip:text 一旦不生效（旧引擎、Dark Reader
+     之类改写样式的插件），color:transparent 会把字变成**隐形但占位**的空档，
+     看上去就像标题里多打了一个空格。所以先给实色，再用 @supports 渐进增强。 */
+  h1 em { font-style: normal; color: var(--accent); }
+  @supports ((background-clip: text) or (-webkit-background-clip: text)) {
+    h1 em {
+      background: var(--grad);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+  }
+  @media (forced-colors: active) {
+    h1 em { background: none; -webkit-text-fill-color: currentColor; color: var(--accent); }
   }
   .lede {
-    margin: 0 auto 28px; max-width: 46ch;
-    color: var(--muted-strong); font-size: 15.5px; line-height: 1.65;
+    /* 不设 max-width：hero 本身就是 680px 的容器，这里再收一道会让正文
+       比下面的警示条窄一大截，两截边缘对不齐，看着像没做完 */
+    margin: 0 0 var(--sp-6);
+    color: var(--muted-strong); font-size: 15.5px; line-height: 1.7;
   }
 
-  /* ---------- 本页专属：拖放区 ---------- */
+  /* ---------- 本页专属：拖放区 ----------
+     这一页的主角，力气都花在这。三条原则：
+     1) 虚线框里**不再铺底色**——卡片里再套一层有色块的框，就成「卡套卡」了；
+        底色只在 hover / 拖入时出现，那一下才够明确。
+     2) 图标做成有「光环」的圆角牌，把视觉重心钉在区域正中；小图标撑不住
+        三百多像素的空框，看着就散。
+     3) 每条用到 color-mix 的声明前面都留一条纯色兜底，理由见 app.css 的
+        入场动画注释——这个项目已经栽过两次「特性不支持就静默失效」。 */
   #drop {
     border: 1.5px dashed var(--line-strong);
-    border-radius: var(--radius-md);
-    padding: 46px 24px; text-align: center; cursor: pointer;
-    transition: border-color .16s, background .16s;
+    border-radius: var(--r-lg);
+    padding: 34px var(--sp-5) 30px; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s;
   }
   #drop:hover, #drop.over {
     border-color: var(--accent);
+    background: var(--accent-soft);
     background: color-mix(in srgb, var(--accent) 5%, transparent);
   }
   #drop .icon {
-    width: 42px; height: 42px; margin: 0 auto 14px;
-    color: var(--muted); transition: color .16s, transform .16s;
+    width: 64px; height: 64px; margin: 0 auto 20px; border-radius: var(--r-lg);
+    display: grid; place-items: center;
+    /* 静止态描边留中性：光环已经是淡蓝的了，再用淡蓝描边就是同一个位置叠两条蓝，
+       分量压过下面那颗主按钮。hover / 拖入时描边和光环一起转蓝，那一下才有层次。 */
+    background: var(--surface); border: 1px solid var(--line);
+    color: var(--accent);
+    box-shadow: 0 0 0 8px var(--accent-soft);          /* 兜底 */
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 9%, transparent);
+    transition: transform .22s cubic-bezier(.2, .7, .3, 1),
+                box-shadow .22s, border-color .22s, color .22s;
   }
-  #drop:hover .icon, #drop.over .icon { color: var(--accent); transform: translateY(-2px); }
-  #drop .big  { font-size: 16px; font-weight: 600; margin-bottom: 7px; letter-spacing: -.01em; }
-  #drop .hint { color: var(--muted); font-size: 12.5px; }
+  #drop .icon svg { width: 26px; height: 26px; }
+  #drop:hover .icon, #drop.over .icon {
+    border-color: var(--accent);
+    transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 0 0 11px var(--accent-soft), var(--sh-glow);            /* 兜底 */
+    box-shadow: 0 0 0 11px color-mix(in srgb, var(--accent) 16%, transparent), var(--sh-glow);
+  }
+  #drop .big  { font-size: 19px; font-weight: 650; letter-spacing: -.022em; margin-bottom: 6px; }
+  #drop .sub  { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+  #drop .chips { justify-content: center; }
   #file { display: none; }
+
+  /* ---------- 本页专属：阶段导轨 ---------- */
+  .phases { display: flex; gap: 6px; margin-bottom: var(--sp-5); }
+  .ph {
+    flex: 1 1 0; min-width: 0;
+    display: flex; flex-direction: column; gap: 8px;
+    font-size: 11.5px; font-weight: 600; color: var(--muted);
+    letter-spacing: -.01em; transition: color .3s;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ph i {
+    display: block; height: 4px; border-radius: var(--r-full);
+    background: var(--line);
+    transition: background .35s ease;
+  }
+  .ph.done { color: var(--muted-strong); }
+  .ph.done i, .ph.on i { background: var(--grad); }
+  .ph.on { color: var(--fg); }
 
   /* ---------- 本页专属：进度 ---------- */
   .row {
     display: flex; justify-content: space-between; align-items: baseline;
-    gap: 12px; font-size: 14.5px;
+    gap: var(--sp-3); font-size: 14.5px;
   }
-  .row .stage { font-weight: 600; letter-spacing: -.01em; }
+  .row .stage { font-weight: 650; letter-spacing: -.015em; }
   .row .meta  { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .row.mid { align-items: center; }
 
   .bar {
-    height: 6px; margin: 16px 0 12px;
-    background: var(--accent-line); border-radius: 999px; overflow: hidden;
+    height: 8px; margin: 18px 0 12px;
+    background: var(--accent-line); border-radius: var(--r-full); overflow: hidden;
   }
   .bar > i {
     display: block; height: 100%; width: 0;
-    background: var(--accent); border-radius: 999px;
-    transition: width .45s cubic-bezier(.4, 0, .2, 1);
+    background: var(--grad); border-radius: var(--r-full);
+    transition: width .5s cubic-bezier(.4, 0, .2, 1);
   }
-  .bar.indet > i { width: 34% !important; animation: sweep 1.4s ease-in-out infinite; }
+  .bar.indet > i { width: 34% !important; animation: sweep 1.5s ease-in-out infinite; }
   @keyframes sweep { 0% { margin-left: -34%; } 100% { margin-left: 100%; } }
 
-  .msg { color: var(--muted); font-size: 12.5px; min-height: 1.5em; }
+  .msg { color: var(--muted); font-size: 12.5px; min-height: 1.55em; }
 
-  /* ---------- 本页专属：结果统计 ---------- */
-  .stats {
-    display: grid; gap: 10px; margin-top: 16px;
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  /* ---------- 本页专属：结果 ---------- */
+  .done-head { display: flex; align-items: center; gap: 9px; }
+  .done-head .tick {
+    flex: none; width: 22px; height: 22px; border-radius: var(--r-full);
+    display: grid; place-items: center; background: var(--grad); color: #fff;
   }
-  .stat { background: var(--bg-soft); border-radius: var(--radius-sm); padding: 12px 14px; }
-  .stat .k { display: block; color: var(--muted); font-size: 12px; margin-bottom: 3px; }
-  .stat b { font-size: 19px; font-weight: 600; color: var(--fg); letter-spacing: -.015em; }
+  .done-head .tick svg { width: 13px; height: 13px; }
+
+  .player-wrap {
+    margin-top: var(--sp-4); border-radius: var(--r-md); overflow: hidden;
+    border: 1px solid var(--line); background: #000; box-shadow: var(--sh-2);
+  }
+  video { width: 100%; display: block; aspect-ratio: 16 / 9; }
+
+  .stats {
+    display: grid; gap: var(--sp-3); margin-top: var(--sp-4);
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  }
+  .stat {
+    position: relative; overflow: hidden;
+    background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: var(--r-md); padding: 14px var(--sp-4) 15px;
+  }
+  .stat::before {                       /* 顶部一条渐变发丝，替代图标 */
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--grad);
+  }
+  .stat .k { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .stat b { font-size: 20px; font-weight: 700; color: var(--fg); letter-spacing: -.025em; }
   /* 数值用比例数字；tabular-nums 只留给原地跳动的计时文本 */
 
-  video { width: 100%; display: block; margin-top: 16px; border-radius: var(--radius-md); background: #000; }
-
   /* ---------- 本页专属：失败 ---------- */
-  .errbox { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; }
-  .errbox svg { flex: none; width: 18px; height: 18px; color: var(--err); margin-top: 2px; }
-  .err { margin: 0; font-size: 14px; color: var(--fg); }
+  .errbox {
+    display: flex; gap: 10px; align-items: flex-start; margin-top: var(--sp-4);
+    background: var(--err-bg); border: 1px solid color-mix(in srgb, var(--err) 22%, transparent);
+    border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
+  }
+  .errbox svg { flex: none; width: 17px; height: 17px; color: var(--err); margin-top: 2px; }
+  .err { margin: 0; font-size: 13.5px; color: var(--fg); white-space: pre-wrap; line-height: 1.65; }
 
-  /* ---------- 状态切换：出结果时收起 landing 内容与提示 ---------- */
+  /* ---------- 状态切换：出结果时收起选择态内容 ---------- */
   body:has(#panelRun:not(.hidden))  .only-pick,
   body:has(#panelDone:not(.hidden)) .only-pick,
   body:has(#panelErr:not(.hidden))  .only-pick { display: none; }
 
-  @media (max-width: 560px) {
-    .hero { padding-top: 36px; }
-    #drop { padding: 34px 16px; }
+  /* ---------- 历史任务 ---------- */
+  #historyCard { margin-top: var(--sp-4); }
+  .hist-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3);
+  }
+  .hist-head h2 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.02em; }
+  .hist-head .sub { color: var(--muted); font-size: 12.5px; }
+  .hist-tools { display: flex; gap: 6px; }
+  .hist-tools .tab {
+    font: inherit; font-size: 12px; font-weight: 600;
+    padding: 5px 10px; border-radius: var(--r-full); cursor: pointer;
+    color: var(--muted-strong); background: transparent;
+    border: 1px solid var(--line);
+  }
+  .hist-tools .tab.on { color: var(--fg); background: var(--surface-2); border-color: var(--line-strong); }
+
+  .hist-list { list-style: none; margin: 0; padding: 0; }
+  .hist-item {
+    display: flex; align-items: center; gap: var(--sp-3);
+    padding: 10px 2px; border-top: 1px solid var(--line);
+    cursor: pointer; transition: background .15s;
+  }
+  .hist-list > li:first-child { border-top: 0; }
+  .hist-item:hover { background: var(--surface-2); }
+  .hist-item .nm {
+    flex: 1 1 auto; min-width: 0;
+    font-size: 13.5px; font-weight: 550;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hist-item .who { flex: none; color: var(--muted); font-size: 12px; }
+  .hist-item .tm { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .st {
+    flex: none; font-size: 11.5px; font-weight: 600;
+    padding: 3px 8px; border-radius: var(--r-full);
+    border: 1px solid var(--line); color: var(--muted-strong); background: var(--surface-2);
+  }
+  .st.done  { color: var(--ok);   background: color-mix(in srgb, var(--ok) 9%, transparent); border-color: color-mix(in srgb, var(--ok) 22%, transparent); }
+  .st.error { color: var(--err);  background: var(--err-bg); border-color: color-mix(in srgb, var(--err) 22%, transparent); }
+  .st.running { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
+  .hist-empty { color: var(--muted); font-size: 13px; padding: var(--sp-3) 0; }
+
+  /* ---------- 本页专属：API Key 设置（仅管理员可见） ---------- */
+  #apiKeyCard { margin-top: var(--sp-4); }
+  .ak-note { margin: 0 0 var(--sp-4); color: var(--muted); font-size: 13px; line-height: 1.7; }
+  .ak-note code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  .ak-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .ak-masked {
+    flex: none; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; color: var(--fg-soft);
+    background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: var(--r-sm); padding: 9px 12px; white-space: nowrap;
+  }
+  .ak-input {
+    flex: 1 1 240px; min-width: 0;
+    font: inherit; font-size: 14px; padding: 9px 12px;
+    color: var(--fg); background: var(--surface);
+    border: 1px solid var(--line-strong); border-radius: var(--r-sm);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .ak-input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .ak-status { margin-top: var(--sp-3); font-size: 13px; color: var(--muted); min-height: 1.4em; }
+  .ak-status.err { color: var(--err); }
+  .ak-status.ok  { color: var(--ok); }
+
+  /* ---------- 本页专属：配音设置 ---------- */
+  #ttsCard { margin-top: var(--sp-4); }
+  .tts-row {
+    display: flex; gap: var(--sp-4); align-items: flex-end; flex-wrap: wrap;
+  }
+  .tts-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .tts-field.grow { flex: 1 1 200px; }
+  .tts-label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: -.01em; }
+  .tts-label b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .tts-select {
+    font: inherit; font-size: 14px; padding: 9px 12px;
+    color: var(--fg); background: var(--surface);
+    border: 1px solid var(--line-strong); border-radius: var(--r-sm);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .tts-select:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .tts-field input[type="range"] { width: 160px; accent-color: var(--accent); }
+  .tts-audio { width: 100%; margin-top: var(--sp-3); }
+  .tts-status { margin-top: var(--sp-3); font-size: 13px; color: var(--muted); min-height: 1.4em; }
+  .tts-status.err { color: var(--err); }
+  .tts-status.ok  { color: var(--ok); }
+
+  .tts-admin { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px solid var(--line); }
+  .tts-admin-title {
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: 13px; font-weight: 650; margin-bottom: var(--sp-3);
+  }
+  .tts-admin-title .sub { color: var(--muted); font-size: 11.5px; font-weight: 500; }
+  .tts-add-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: var(--sp-3); }
+  .tts-add-row .ak-input { flex: 1 1 150px; }
+  .tts-list { list-style: none; margin: 0; padding: 0; }
+  .tts-list li {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 9px 2px; border-top: 1px solid var(--line); font-size: 13px;
+  }
+  .tts-list li:first-child { border-top: 0; }
+  .tts-li-name { font-weight: 600; }
+  .tts-li-id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--fg-soft);
+    background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: var(--r-sm); padding: 2px 7px;
+  }
+  .tts-li-note { color: var(--muted); font-size: 12px; }
+  .tts-del {
+    margin-left: auto; font: inherit; font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: var(--r-full); cursor: pointer;
+    color: var(--err); background: transparent;
+    border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
+  }
+  .tts-del:hover { background: var(--err-bg); }
+
+  @media (max-width: 600px) {
+    .hist-item .tm { display: none; }
+    .hist-item .who { display: none; }
+    .hero { padding-top: 40px; }
+    /* 左右至少留 14px：图标那圈光环要往外扩 8px，挤到边上会被裁 */
+    #drop { padding: 26px 14px 24px; }
+    #drop .icon { width: 56px; height: 56px; margin-bottom: 16px; }
+    #drop .icon svg { width: 23px; height: 23px; }
+    #drop .big { font-size: 17.5px; }
+    .ph { font-size: 10.5px; }
+    .tts-field input[type="range"] { width: 100%; }
+    .tts-add-row .ak-input { flex: 1 1 100%; }
   }
 </style>
 </head>
 <body>
 
-<header class="topbar">
+<header class="topbar drop d1">
   <div class="shell">
     <div class="brand">
       <span class="mark" aria-hidden="true">
@@ -104,8 +333,10 @@
       <a class="home" href="/">HierAD</a>
       <span class="tag">口述影像</span>
     </div>
-    <div class="topbar-right">
-      <a class="btn sm" href="/">项目介绍</a>
+    <!-- 两个并列入口：当前页用 .current 标出（是 <span> 不是 <a>，点自己没意义） -->
+    <nav class="topbar-right">
+      <a class="navlink" href="/features">看看它强在哪</a>
+      <span class="navlink current" aria-current="page">开始生成</span>
       <button id="themeBtn" aria-label="切换深浅色">
         <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -117,83 +348,181 @@
           <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
         </svg>
       </button>
-    </div>
+    </nav>
   </div>
 </header>
 
 <main class="shell">
-  <section class="hero">
-    <h1>为视频生成口述影像</h1>
-    <p class="lede">
-      上传一段 3–5 分钟的片段，HierAD 会把解说插进对白的间隙里——不盖住台词，也不漏掉画面。
+  <!-- 入场动画只给 hero 挂：下面几个面板会被 .hidden 反复开关，
+       display:none 的元素不跑动画，重新显示时会从头播一遍还带着 delay——
+       用户点完要干等半秒才看见东西。 -->
+  <section class="hero only-pick">
+    <p class="eyebrow rise d1">为视频生成口述影像</p>
+    <h1 class="rise d2">把解说，放进<em>对白的空档</em>里</h1>
+    <p class="lede rise d3">
+      上传一段 3–5 分钟的片段，HierAD 会识别对白时间轴、读懂画面，把解说合成到没人说话的间隙中——不盖住台词，也不漏掉画面。
     </p>
 
-    <div class="notice only-pick">
+    <div class="notice rise d5">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
         <circle cx="12" cy="12" r="9"/><path d="M12 7.8h.01"/><path d="M12 11v5.2"/>
       </svg>
-      <span>每次生成都会真实调用阿里云百炼（VLM 画面理解 + LLM 撰写 + CosyVoice 语音合成），会消耗你的 API 额度；片段越长，调用次数越多。3–5 分钟的片段整个流程约需 5–10 分钟，期间请勿关闭页面。</span>
+      <span><b>每次生成都会真实调用阿里云百炼</b>（VLM 画面理解 + LLM 撰写 + CosyVoice 语音合成），会消耗你的 API 额度；片段越长，调用次数越多。3–5 分钟的片段整个流程约需 5–10 分钟，期间请勿关闭页面。</span>
     </div>
+  </section>
 
-    <!-- 1. 选择文件 -->
-    <div class="card" id="panelPick">
-      <div id="drop">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <!-- 配音设置（先选好再上传，上传即开始生成） -->
+  <div class="card only-pick" id="ttsCard">
+    <div class="hist-head">
+      <h2>配音设置</h2>
+      <span class="sub">百炼 CosyVoice · 云端音色</span>
+    </div>
+    <div class="tts-row">
+      <div class="tts-field grow">
+        <label class="tts-label" for="ttsVoice">音色</label>
+        <select id="ttsVoice" class="tts-select"></select>
+      </div>
+      <div class="tts-field">
+        <label class="tts-label" for="ttsSpeed">语速 <b id="ttsSpeedVal">1.0×</b></label>
+        <input type="range" id="ttsSpeed" min="0.5" max="2.0" step="0.1" value="1.0">
+      </div>
+      <div class="tts-field">
+        <button id="ttsPreview" type="button" class="btn">试听</button>
+      </div>
+    </div>
+    <div class="tts-status" id="ttsStatus" aria-live="polite"></div>
+    <audio id="ttsAudio" controls class="tts-audio hidden"></audio>
+
+    <!-- 管理音色（仅管理员） -->
+    <div class="tts-admin hidden" id="ttsAdmin">
+      <div class="tts-admin-title">管理音色 <span class="sub">仅管理员 · 添加后全员可选</span></div>
+      <div class="tts-add-row">
+        <input class="ak-input" id="ttsNewName" placeholder="显示名（如 龙婉）" autocomplete="off">
+        <input class="ak-input" id="ttsNewId" placeholder="百炼音色名（如 longwan_v2）" autocomplete="off" spellcheck="false">
+        <input class="ak-input" id="ttsNewNote" placeholder="备注（可选）" autocomplete="off">
+        <button class="btn primary" id="ttsAdd" type="button">添加</button>
+      </div>
+      <ol class="tts-list" id="ttsList"></ol>
+    </div>
+  </div>
+
+  <!-- 1. 选择文件 -->
+  <div class="card only-pick" id="panelPick">
+    <div id="drop">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 15.5V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/>
           <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>
         </svg>
-        <div class="big">把视频拖到这里</div>
-        <div class="hint">支持 mp4 / mov / mkv / webm / avi · 时长 3–5 分钟 · 不超过 500MB</div>
+      </span>
+      <div class="big">把视频拖到这里</div>
+      <div class="sub">松手即开始生成</div>
+      <div class="chips">
+        <span class="chip">mp4 · mov · mkv · webm · avi</span>
+        <span class="chip">时长 3–5 分钟</span>
+        <span class="chip">不超过 500MB</span>
       </div>
-      <div class="actions center">
-        <label class="btn primary" for="file">选择视频</label>
+    </div>
+    <div class="actions center">
+      <label class="btn primary lg" for="file">选择视频</label>
+    </div>
+    <input type="file" id="file" accept=".mp4,.mov,.mkv,.webm,.avi,.m4v,video/*">
+  </div>
+
+  <!-- 1.5 历史任务 -->
+  <div class="card only-pick" id="historyCard">
+    <div class="hist-head">
+      <h2>历史任务</h2>
+      <div class="hist-tools hidden" id="histTools">
+        <button class="tab on" type="button" data-scope="own">只看我的</button>
+        <button class="tab" type="button" data-scope="all">全部</button>
       </div>
-      <input type="file" id="file" accept=".mp4,.mov,.mkv,.webm,.avi,.m4v,video/*">
+    </div>
+    <div class="hist-empty" id="histEmpty">还没有任务，从上面上传一段视频开始。</div>
+    <ol class="hist-list" id="histList"></ol>
+  </div>
+
+  <!-- 管理：API Key 设置（仅管理员可见，改完立即生效） -->
+  <div class="card hidden only-pick" id="apiKeyCard">
+    <div class="hist-head">
+      <h2>API Key 设置</h2>
+      <span class="sub">仅管理员可见 · 改动立即生效</span>
+    </div>
+    <p class="ak-note">
+      这里是阿里云百炼（DashScope）的 API Key，VLM 画面理解、LLM 撰写、CosyVoice 语音合成共用同一个。
+      保存后立即生效、无需重启，同时会写回 <code>config.yaml</code>，重启后仍然有效。
+    </p>
+    <div class="ak-row">
+      <code class="ak-masked" id="akMasked">读取中…</code>
+      <input class="ak-input" id="akInput" type="password" placeholder="粘贴新的 DashScope API Key"
+             autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="btn primary" id="akSave" type="button">保存</button>
+    </div>
+    <div class="ak-status" id="akStatus" aria-live="polite"></div>
+  </div>
+
+  <!-- 2. 进行中 -->
+  <div class="card hidden" id="panelRun">
+    <div class="phases" aria-hidden="true">
+      <span class="ph"><i></i>上传</span>
+      <span class="ph"><i></i>语音识别</span>
+      <span class="ph"><i></i>理解画面</span>
+      <span class="ph"><i></i>撰写解说</span>
+      <span class="ph"><i></i>合成成片</span>
     </div>
 
-    <!-- 2. 进行中 -->
-    <div class="card hidden" id="panelRun">
-      <div class="row">
-        <span class="stage" id="runStage" aria-live="polite">准备中</span>
-        <span class="meta" id="runMeta"></span>
-      </div>
-      <div class="bar" id="runBar"><i></i></div>
-      <div class="msg" id="runMsg" aria-live="polite"></div>
-      <div class="actions">
-        <button id="cancelBtn" disabled>上传中…</button>
-      </div>
+    <div class="row">
+      <span class="stage" id="runStage" aria-live="polite">准备中</span>
+      <span class="meta" id="runMeta"></span>
+    </div>
+    <div class="bar" id="runBar"><i></i></div>
+    <div class="msg" id="runMsg" aria-live="polite"></div>
+    <div class="actions">
+      <button id="cancelBtn" disabled>上传中…</button>
+    </div>
+  </div>
+
+  <!-- 3. 完成 -->
+  <div class="card hidden" id="panelDone">
+    <div class="row mid">
+      <span class="done-head">
+        <span class="tick" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+               stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg>
+        </span>
+        <span class="stage">生成完成</span>
+      </span>
+      <span class="meta" id="doneMeta"></span>
     </div>
 
-    <!-- 3. 完成 -->
-    <div class="card hidden" id="panelDone">
-      <div class="row"><span class="stage">生成完成</span><span class="meta" id="doneMeta"></span></div>
-      <video id="player" controls playsinline></video>
-      <div class="stats" id="doneStat"></div>
-      <div class="actions">
-        <a class="btn primary" id="dlVideo" download>下载 AD 视频</a>
-        <a class="btn" id="dlSrt" download>下载字幕 (SRT)</a>
-        <button id="againBtn">再生成一个</button>
-      </div>
-    </div>
+    <div class="player-wrap"><video id="player" controls playsinline></video></div>
 
-    <!-- 4. 失败 -->
-    <div class="card hidden" id="panelErr">
-      <div class="row"><span class="stage">没有成功</span></div>
-      <div class="errbox">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
-          <path d="M12 9v4"/><path d="M12 17h.01"/>
-        </svg>
-        <p class="err" id="errText"></p>
-      </div>
-      <div class="actions">
-        <a class="btn hidden" id="errSrt" download>下载已生成的字幕</a>
-        <button class="primary" id="retryBtn">换一个视频重试</button>
-      </div>
+    <div class="stats" id="doneStat"></div>
+
+    <div class="actions">
+      <a class="btn primary" id="dlVideo" download>下载 AD 视频</a>
+      <a class="btn" id="dlSrt" download>下载字幕 (SRT)</a>
+      <button id="againBtn">再生成一个</button>
     </div>
-  </section>
+  </div>
+
+  <!-- 4. 失败 -->
+  <div class="card hidden" id="panelErr">
+    <div class="row"><span class="stage">没有成功</span></div>
+    <div class="errbox">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
+        <path d="M12 9v4"/><path d="M12 17h.01"/>
+      </svg>
+      <p class="err" id="errText"></p>
+    </div>
+    <div class="actions">
+      <a class="btn hidden" id="errSrt" download>下载已生成的字幕</a>
+      <button class="primary" id="retryBtn">换一个视频重试</button>
+    </div>
+  </div>
 
   <!-- 原理说明 -->
   <section class="sec only-pick">
@@ -221,7 +550,7 @@
 
 <footer class="shell foot">
   <span>HierAD · 层次化无障碍视频描述</span>
-  <span>本机自用 · 127.0.0.1:8077 · 不对外提供访问</span>
+  <span>局域网服务 · 需登录使用</span>
 </footer>
 
 <script>
@@ -233,9 +562,50 @@
 
   let pollTimer = null, tickTimer = null, startedAt = 0, currentJob = null;
   let progressLabel = "";   // 当前的 "3/6" 之类，空串表示该阶段没有细粒度进度
+  let isAdmin = false, histScope = "own";
 
   const fmtSec = s => s < 60 ? `${Math.round(s)} 秒`
                              : `${Math.floor(s / 60)} 分 ${Math.round(s % 60)} 秒`;
+
+  // 会话失效（过期 / 被撤销）统一回登录页。轮询和上传都要走这里，
+  // 否则旧的 `if (!r.ok) return;` 会让页面静默空转。
+  function needLogin() {
+    clearTimers();
+    location.href = "/login?next=/app";
+  }
+
+  function apiFetch(url, opts) {
+    return fetch(url, Object.assign({ credentials: "same-origin" }, opts || {}))
+      .then(r => {
+        if (r.status === 401) { needLogin(); throw new Error("unauthorized"); }
+        return r;
+      });
+  }
+
+  // ---------- 阶段导轨（纯展示） ----------
+  // 后端的 stage 文案是自由文本，这里只按关键词粗映射到 5 个阶段；认不出来就保持原样，不猜。
+  const PHASES = [
+    ["排队", "准备", "上传", "加载 ASR"],
+    ["ASR", "语音识别"],
+    ["场景切分", "Stage1", "Scene", "人脸标注"],
+    ["AD 切分", "Stage2", "Stage3"],
+    ["AD 压制", "保存结果", "TTS", "配音", "合成", "字幕", "导出"],
+  ];
+  const phEls = Array.prototype.slice.call(document.querySelectorAll(".ph"));
+  function setPhase(stage, allDone) {
+    let hit = allDone ? PHASES.length : -1;
+    if (!allDone && stage) {
+      for (let i = 0; i < PHASES.length && hit < 0; i++) {
+        if (PHASES[i].some(k => stage.indexOf(k) !== -1)) hit = i;
+      }
+    }
+    if (hit < 0) return;
+    phEls.forEach((el, i) => {
+      el.classList.toggle("done", i < hit);
+      el.classList.toggle("on", i === hit);
+    });
+  }
+  const resetPhase = () => phEls.forEach(el => el.classList.remove("on", "done"));
 
   // ---------- 上传 ----------
   // 用 XHR 而不是 fetch：fetch 拿不到上传进度
@@ -247,9 +617,14 @@
     $("runBar").firstElementChild.style.width = "0%";
     $("cancelBtn").disabled = false;
     $("cancelBtn").textContent = "上传中…";
+    resetPhase();
+    setPhase("上传");
 
     const fd = new FormData();
     fd.append("file", file);
+    // 配音设置：voice 是百炼音色名，speed 是语速倍率
+    fd.append("voice", $("ttsVoice").value || "");
+    fd.append("speed", $("ttsSpeed").value || "");
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/jobs");
@@ -266,11 +641,13 @@
       $("cancelBtn").textContent = "生成中，请勿关闭页面";
       let body = null;
       try { body = JSON.parse(xhr.responseText); } catch (_) {}
+      if (xhr.status === 401) { needLogin(); return; }
       if (xhr.status === 201 && body && body.job_id) {
         currentJob = body.job_id;
         startedAt = Date.now();
         startTicking();
         poll(body.job_id);
+        loadHistory();
       } else {
         fail((body && body.detail) || `上传失败（HTTP ${xhr.status}）`);
       }
@@ -286,11 +663,14 @@
     const tick = async () => {
       let s;
       try {
-        const r = await fetch(url, { cache: "no-store" });
+        const r = await apiFetch(url, { cache: "no-store" });
         if (r.status === 404) { fail("任务不存在了（可能已被清理）。"); return; }
         if (!r.ok) return;               // 瞬时错误，下次再试
         s = await r.json();
-      } catch (_) { return; }            // 网络抖动，下次再试
+      } catch (err) {
+        if (err && err.message === "unauthorized") return;
+        return;                          // 网络抖动，下次再试
+      }
 
       if (s.status === "done")       { clearTimers(); done(s); }
       else if (s.status === "error") { clearTimers(); fail(s.error || "生成失败。", s); }
@@ -302,6 +682,7 @@
 
   function render(s) {
     $("runStage").textContent = s.stage || "生成中";
+    setPhase(s.stage);
     if (s.current != null && s.total) {
       $("runBar").classList.remove("indet");
       $("runBar").firstElementChild.style.width =
@@ -334,6 +715,8 @@
   // ---------- 结果 ----------
   function done(s) {
     show("panelDone");
+    loadHistory();
+    setPhase(null, true);
     $("player").src = `/api/jobs/${s.job_id}/video`;
     $("dlVideo").href = `/api/jobs/${s.job_id}/video`;
     $("dlVideo").setAttribute("download", `AD_${s.filename || "video.mp4"}`);
@@ -356,6 +739,7 @@
   function fail(message, s) {
     clearTimers();
     show("panelErr");
+    loadHistory();
     $("errText").textContent = message;
     const srt = $("errSrt");
     if (s && s.job_id && s.has_srt) {
@@ -372,7 +756,324 @@
     $("player").removeAttribute("src");
     $("file").value = "";
     $("runBar").firstElementChild.style.width = "0%";
+    resetPhase();
     show("panelPick");
+    loadHistory();
+  }
+
+  // ---------- 历史任务 ----------
+  const STATUS_TEXT = { done: "完成", error: "失败", running: "生成中", queued: "排队中" };
+
+  function fmtTime(sec) {
+    if (!sec) return "";
+    const d = new Date(sec * 1000);
+    const p = n => String(n).padStart(2, "0");
+    return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function openJob(s) {
+    if (s.status === "done") { done(s); return; }
+    if (s.status === "error") { fail(s.error || "生成失败。", s); return; }
+    // running / queued：按服务端记录的已用时长校准计时，再接着轮询
+    clearTimers();
+    currentJob = s.job_id;
+    startedAt = Date.now() - (s.elapsed_sec || 0) * 1000;
+    show("panelRun");
+    $("cancelBtn").disabled = true;
+    $("cancelBtn").textContent = "生成中，请勿关闭页面";
+    render(s);
+    startTicking();
+    poll(s.job_id);
+  }
+
+  function renderHistory(items) {
+    const list = $("histList");
+    list.textContent = "";
+    $("histEmpty").classList.toggle("hidden", items.length > 0);
+
+    items.forEach(s => {
+      const li = document.createElement("li");
+      const row = document.createElement("div");
+      row.className = "hist-item";
+      row.tabIndex = 0;
+      row.setAttribute("role", "button");
+      row.title = s.filename || s.job_id;
+
+      const st = document.createElement("span");
+      st.className = "st " + s.status;
+      st.textContent = STATUS_TEXT[s.status] || s.status;
+
+      const nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = s.filename || s.job_id;
+
+      row.appendChild(st);
+      row.appendChild(nm);
+
+      if (isAdmin && s.owner) {
+        const who = document.createElement("span");
+        who.className = "who";
+        who.textContent = s.owner;
+        row.appendChild(who);
+      }
+
+      const tm = document.createElement("span");
+      tm.className = "tm";
+      tm.textContent = fmtTime(s.created_at);
+      row.appendChild(tm);
+
+      const activate = () => openJob(s);
+      row.addEventListener("click", activate);
+      row.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(); }
+      });
+
+      li.appendChild(row);
+      list.appendChild(li);
+    });
+  }
+
+  function loadHistory() {
+    const q = `/api/jobs?limit=20&scope=${encodeURIComponent(histScope)}`;
+    apiFetch(q, { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (!data) return;
+        renderHistory(data.jobs || []);
+      })
+      .catch(() => { /* 会话失效已跳转；其他错误静默，历史不是主流程 */ });
+  }
+
+  function setupHistory() {
+    const tools = $("histTools");
+    tools.querySelectorAll(".tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        histScope = btn.dataset.scope === "all" ? "all" : "own";
+        tools.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b === btn));
+        loadHistory();
+      });
+    });
+
+    apiFetch("/api/me", { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(user => {
+        if (!user) return;
+        isAdmin = !!user.is_admin;
+        if (isAdmin) { tools.classList.remove("hidden"); setupApiKey(); }
+        setupTts();
+        loadHistory();
+      })
+      .catch(() => {});
+  }
+
+  // ---------- API Key 设置（仅管理员） ----------
+  function loadApiKey() {
+    apiFetch("/api/admin/api_key", { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d) return;
+        $("akMasked").textContent = d.configured ? d.masked : "未配置";
+      })
+      .catch(() => { $("akMasked").textContent = "读取失败"; });
+  }
+
+  function setAkStatus(text, kind) {
+    const el = $("akStatus");
+    el.textContent = text;
+    el.className = "ak-status" + (kind ? " " + kind : "");
+  }
+
+  function setupApiKey() {
+    $("apiKeyCard").classList.remove("hidden");
+    loadApiKey();
+    $("akSave").onclick = async () => {
+      const val = $("akInput").value.trim();
+      if (!val) { setAkStatus("请先粘贴 API Key。", "err"); return; }
+      $("akSave").disabled = true;
+      try {
+        const r = await apiFetch("/api/admin/api_key", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_key: val })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok) {
+          $("akInput").value = "";
+          $("akMasked").textContent = d.masked || "已配置";
+          setAkStatus(
+            d.persisted
+              ? "已保存，立即生效。"
+              : "已生效，但写回 config.yaml 失败（重启后需重新设置）。",
+            d.persisted ? "ok" : "err"
+          );
+        } else {
+          setAkStatus(d.detail || "保存失败。", "err");
+        }
+      } catch (err) {
+        if (err && err.message === "unauthorized") return;
+        setAkStatus("保存失败，请稍后再试。", "err");
+      } finally {
+        $("akSave").disabled = false;
+      }
+    };
+  }
+
+  // ---------- 配音设置 ----------
+  let ttsVoices = [];
+
+  function setTtsStatus(text, kind) {
+    const el = $("ttsStatus");
+    el.textContent = text;
+    el.className = "tts-status" + (kind ? " " + kind : "");
+  }
+
+  function renderTtsVoices(voices) {
+    const sel = $("ttsVoice");
+    const prev = sel.value;
+    sel.textContent = "";
+    voices.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v.voice_id;
+      opt.textContent = v.note ? `${v.name} · ${v.note}` : v.name;
+      sel.appendChild(opt);
+    });
+    if (prev && Array.prototype.some.call(sel.options, o => o.value === prev)) {
+      sel.value = prev;
+    }
+  }
+
+  function renderTtsList(voices) {
+    const list = $("ttsList");
+    list.textContent = "";
+    voices.forEach(v => {
+      const li = document.createElement("li");
+
+      const nm = document.createElement("span");
+      nm.className = "tts-li-name";
+      nm.textContent = v.name;
+
+      const id = document.createElement("code");
+      id.className = "tts-li-id";
+      id.textContent = v.voice_id;
+
+      li.appendChild(nm);
+      li.appendChild(id);
+
+      if (v.note) {
+        const note = document.createElement("span");
+        note.className = "tts-li-note";
+        note.textContent = v.note;
+        li.appendChild(note);
+      }
+
+      const del = document.createElement("button");
+      del.className = "tts-del";
+      del.type = "button";
+      del.textContent = "删除";
+      del.onclick = () => deleteVoice(v.id, v.name);
+      li.appendChild(del);
+
+      list.appendChild(li);
+    });
+  }
+
+  function loadTtsVoices() {
+    apiFetch("/api/tts/voices", { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d) return;
+        ttsVoices = d.voices || [];
+        renderTtsVoices(ttsVoices);
+        if (isAdmin) renderTtsList(ttsVoices);
+      })
+      .catch(() => {});
+  }
+
+  async function previewTts() {
+    const voice = $("ttsVoice").value;
+    const speed = parseFloat($("ttsSpeed").value);
+    setTtsStatus("合成中…", "");
+    $("ttsPreview").disabled = true;
+    try {
+      const r = await apiFetch("/api/tts/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ voice, speed, text: "你好，这是音色试听。" })
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setTtsStatus(d.detail || "试听失败。", "err");
+        return;
+      }
+      const blob = await r.blob();
+      const audio = $("ttsAudio");
+      if (audio.src) URL.revokeObjectURL(audio.src);
+      audio.src = URL.createObjectURL(blob);
+      audio.classList.remove("hidden");
+      audio.play().catch(() => {});
+      setTtsStatus("试听音频已就绪。", "ok");
+    } catch (err) {
+      if (err && err.message === "unauthorized") return;
+      setTtsStatus("试听失败，请稍后再试。", "err");
+    } finally {
+      $("ttsPreview").disabled = false;
+    }
+  }
+
+  async function addVoice() {
+    const name = $("ttsNewName").value.trim();
+    const voice_id = $("ttsNewId").value.trim();
+    const note = $("ttsNewNote").value.trim();
+    if (!name || !voice_id) { setTtsStatus("显示名和百炼音色名都不能为空。", "err"); return; }
+    $("ttsAdd").disabled = true;
+    try {
+      const r = await apiFetch("/api/tts/voices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, voice_id, note })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        $("ttsNewName").value = "";
+        $("ttsNewId").value = "";
+        $("ttsNewNote").value = "";
+        setTtsStatus("已添加，全员可选。", "ok");
+        loadTtsVoices();
+      } else {
+        setTtsStatus(d.detail || "添加失败。", "err");
+      }
+    } catch (err) {
+      if (err && err.message === "unauthorized") return;
+      setTtsStatus("添加失败，请稍后再试。", "err");
+    } finally {
+      $("ttsAdd").disabled = false;
+    }
+  }
+
+  async function deleteVoice(id, name) {
+    if (!confirm(`删除音色「${name}」？`)) return;
+    try {
+      const r = await apiFetch(`/api/tts/voices/${id}`, { method: "DELETE" });
+      if (r.ok) {
+        setTtsStatus("已删除。", "ok");
+        loadTtsVoices();
+      } else {
+        const d = await r.json().catch(() => ({}));
+        setTtsStatus(d.detail || "删除失败。", "err");
+      }
+    } catch (err) {
+      if (err && err.message === "unauthorized") return;
+      setTtsStatus("删除失败，请稍后再试。", "err");
+    }
+  }
+
+  function setupTts() {
+    loadTtsVoices();
+    const speed = $("ttsSpeed"), val = $("ttsSpeedVal");
+    speed.oninput = () => { val.textContent = parseFloat(speed.value).toFixed(1) + "×"; };
+    $("ttsPreview").onclick = previewTts;
+    $("ttsAdd").onclick = addVoice;
+    if (isAdmin) $("ttsAdmin").classList.remove("hidden");
   }
 
   // ---------- 事件 ----------
@@ -391,6 +1092,8 @@
 
   $("againBtn").onclick = reset;
   $("retryBtn").onclick = reset;
+
+  setupHistory();
 })();
 </script>
 </body>

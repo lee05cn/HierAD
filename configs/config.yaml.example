@@ -55,3 +55,19 @@ tmdb:
 paths:
   actor_databases: "./actor_databases"
   work_dir: "./work_dir"
+
+# Web 演示平台（python -m webapp.server）
+# 默认只绑本机；要让局域网同事访问，把 host 改成 "0.0.0.0"。
+# 注意：uvicorn 必须单进程运行（不要加 --workers），任务队列在进程内存里。
+web:
+  host: "127.0.0.1"              # 0.0.0.0 = 局域网可访问
+  port: 8077
+  db_path: "./webapp/hierad_web.db"
+  allow_registration: true       # false = 关闭自助注册，只能用已有账号
+  registration_code: ""          # 非空 = 注册时必须填写邀请码
+  cookie_secure: false           # 只在 HTTPS（反代）后面才设 true
+  session_hours: 168             # 登录有效期（7 天）
+  keep_jobs: 20                  # 保留最近 N 个任务目录（含产物）
+  # 环境变量覆盖：HIERAD_WEB_HOST / HIERAD_WEB_PORT / HIERAD_WEB_DB_PATH /
+  #   HIERAD_WEB_ALLOW_REGISTRATION / HIERAD_WEB_REGISTRATION_CODE /
+  #   HIERAD_WEB_COOKIE_SECURE / HIERAD_WEB_SESSION_HOURS / HIERAD_WEB_KEEP_JOBS
