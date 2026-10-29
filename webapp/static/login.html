@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>登录 · HierAD</title>
+<title>登录 · 声眸</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/app.js"></script>
 <style>
@@ -84,7 +84,7 @@
           <path d="M4 10v4"/><path d="M8 7v10"/><path d="M12 4v16"/><path d="M16 8v8"/><path d="M20 11v2"/>
         </svg>
       </span>
-      <a class="home" href="/">HierAD</a>
+      <a class="home" href="/">声眸</a>
       <span class="tag">层次化无障碍视频描述</span>
     </div>
     <nav class="topbar-right">
@@ -113,7 +113,7 @@
             <path d="M4 10v4"/><path d="M8 7v10"/><path d="M12 4v16"/><path d="M16 8v8"/><path d="M20 11v2"/>
           </svg>
         </span>
-        <h1 id="authTitle">登录 HierAD</h1>
+        <h1 id="authTitle">登录 声眸</h1>
         <p id="authSub">使用团队账号进入生成工作台</p>
       </div>
 
@@ -149,7 +149,7 @@
     </div>
 
     <footer class="shell foot" style="margin-top: var(--sp-5);">
-      <span>HierAD · 层次化无障碍视频描述</span>
+      <span>声眸 · 层次化无障碍视频描述</span>
     </footer>
   </div>
 </main>
@@ -195,7 +195,7 @@
     var reg = mode === "register";
     tabLogin.classList.toggle("on", !reg);
     tabRegister.classList.toggle("on", reg);
-    title.textContent = reg ? "注册 HierAD" : "登录 HierAD";
+    title.textContent = reg ? "注册 声眸" : "登录 声眸";
     sub.textContent = reg
       ? (cfg.has_users ? "新账号只能看到自己的任务" : "第一个注册的账号将成为管理员")
       : "使用团队账号进入生成工作台";

@@ -70,7 +70,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="HierAD",
+    title="声眸",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
@@ -529,7 +529,7 @@ def main() -> None:
     import uvicorn
 
     shown = _lan_ip() if HOST in ("0.0.0.0", "::", "") else HOST
-    print(f"HierAD Web  →  http://{shown}:{PORT}")
+    print(f"声眸 Web  →  http://{shown}:{PORT}")
     print(f"数据库      →  {db.DB_PATH}")
     print(f"任务目录    →  {jobs.JOBS_DIR}")
     if HOST in ("0.0.0.0", "::", ""):
